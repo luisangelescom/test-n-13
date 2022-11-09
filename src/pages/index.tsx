@@ -4,9 +4,29 @@ import Link from "next/link";
 import { signIn, signOut, useSession } from "next-auth/react";
 
 import { trpc } from "../utils/trpc";
+import type { Example } from "@prisma/client";
 
 const Home: NextPage = () => {
-  const hello = trpc.example.hello.useQuery({ text: "from tRPC" });
+  const { data, isLoading, isError, error } = trpc.example.hello1.useQuery({
+    text: ", hello son hello 1",
+    name: "Luis",
+    lastname: "Gonzalex",
+  });
+
+  const {
+    data: dataExplore,
+    refetch,
+    error: errorServer,
+  } = trpc.example.getAllExamplesByServer.useQuery();
+
+  const addNewExample = trpc.example.addExample.useMutation({
+    onSuccess: () => refetch(),
+  });
+
+  const { mutate, isLoading: isDelete } =
+    trpc.example.deleteExample.useMutation({
+      onSuccess: () => refetch(),
+    });
 
   return (
     <>
@@ -52,10 +72,53 @@ const Home: NextPage = () => {
             documentation="https://www.prisma.io/docs/"
           />
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            addNewExample.mutate();
+          }}
+        >
+          Add Example
+        </button>
         <div className="flex w-full items-center justify-center pt-6 text-2xl text-blue-500">
-          {hello.data ? <p>{hello.data.greeting}</p> : <p>Loading..</p>}
+          {data ? <p>{data.greeting}</p> : <p></p>}
+          {isLoading ? <p>Loading ..</p> : <p></p>}
+          {isError ? <p>Error carnal ..</p> : <p></p>}
+          {errorServer?.data && (
+            <>
+              <pre>
+                Error: {JSON.stringify(errorServer.data.zodError, null, 2)}
+              </pre>
+              {console.log("typeof error.data")}
+              {console.log(errorServer.data.zodError?.fieldErrors)}
+              {console.log(errorServer.data.zodError?.fieldErrors.text)}
+            </>
+          )}
+
+          {/* {error ? <p>{error.message}</p> : null} */}
         </div>
-        <AuthShowcase />
+        <div>
+          {dataExplore && dataExplore.length ? (
+            dataExplore.map((examples: Example) => (
+              <button
+                key={examples.id}
+                className={`mt-2 flex flex-col gap-2 border-2 ${
+                  isDelete ? "border-gray-300" : "border-red-300"
+                }  p-2`}
+                onClick={() => {
+                  console.log(examples.id);
+                  mutate(examples.id);
+                }}
+                disabled={isDelete}
+              >
+                <span>{examples.id}</span>
+                <span>{new Date(examples.createdAt).toISOString()}</span>
+              </button>
+            ))
+          ) : (
+            <span>No hay example</span>
+          )}
+        </div>
       </main>
     </>
   );
@@ -63,33 +126,7 @@ const Home: NextPage = () => {
 
 export default Home;
 
-const AuthShowcase: React.FC = () => {
-  const { data: sessionData } = useSession();
 
-  const { data: secretMessage } = trpc.auth.getSecretMessage.useQuery(
-    undefined, // no input
-    { enabled: sessionData?.user !== undefined },
-  );
-
-  return (
-    <div className="flex flex-col items-center justify-center gap-2">
-      {sessionData && (
-        <p className="text-2xl text-blue-500">
-          Logged in as {sessionData?.user?.name}
-        </p>
-      )}
-      {secretMessage && (
-        <p className="text-2xl text-blue-500">{secretMessage}</p>
-      )}
-      <button
-        className="rounded-md border border-black bg-violet-50 px-4 py-2 text-xl shadow-lg hover:bg-violet-100"
-        onClick={sessionData ? () => signOut() : () => signIn()}
-      >
-        {sessionData ? "Sign out" : "Sign in"}
-      </button>
-    </div>
-  );
-};
 
 type TechnologyCardProps = {
   name: string;
